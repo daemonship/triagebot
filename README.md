@@ -1,6 +1,6 @@
 # TriageBot
 
-Automatically classify GitHub issues and request missing information — powered by `gpt-4o-mini`.
+**TriageBot** is a zero-infrastructure GitHub Action that automatically classifies new issues into categories (`bug`, `feature-request`, `question`, `documentation`) using `gpt-4o-mini`, applies the matching label, checks whether required fields (reproduction steps, expected behavior, actual behavior) are present, and posts a single consolidated comment requesting anything missing — then removes the `needs-info` label automatically once the issue is updated.
 
 ## Feedback & Ideas
 
@@ -19,15 +19,37 @@ Automatically classify GitHub issues and request missing information — powered
 | LLM classification & label application | ✅ Complete | gpt-4o-mini, function calling, retry |
 | Missing info detection & comment posting | ✅ Complete | Heuristic field checks, needs-info lifecycle |
 | YAML config with zero-config defaults | ✅ Complete | pydantic validation, .github/triagebot.yml |
-| README, install docs & marketplace metadata | 🚧 In Progress | |
-| Code review | 📋 Planned | |
+| README, install docs & marketplace metadata | ✅ Complete | LICENSE, screenshots, marketplace branding |
+| Code review | 🚧 In Progress | |
 | Publish to GitHub Marketplace | 📋 Planned | |
 
+## How It Works
+
 When someone opens an issue, TriageBot:
-1. Classifies it into a category (`bug`, `feature-request`, `question`, `documentation`) and applies the matching label
-2. Checks whether required fields are present (reproduction steps, expected behavior, actual behavior) and posts a comment requesting anything missing
+1. **Classifies** it into a category (`bug`, `feature-request`, `question`, `documentation`) and applies the matching label
+2. **Checks** whether required fields are present (reproduction steps, expected behavior, actual behavior) and posts a comment requesting anything missing
 
 On issue edits, it re-checks the missing fields and removes the `needs-info` label once everything is filled in.
+
+### Classification label applied
+
+> _Screenshot placeholder — shows a newly opened issue with a `bug` label applied within seconds_
+
+![Classification label applied](docs/screenshots/label-applied.png)
+
+### Missing info comment
+
+> _Screenshot placeholder — shows the automated comment listing which required fields are absent, and the `needs-info` label on the issue_
+
+![Missing info comment](docs/screenshots/missing-info-comment.png)
+
+### Auto-resolved after edit
+
+> _Screenshot placeholder — shows the `needs-info` label removed after the reporter filled in the missing fields_
+
+![needs-info removed after edit](docs/screenshots/needs-info-removed.png)
+
+---
 
 ## Install
 
@@ -58,21 +80,17 @@ jobs:
 
 That's it. No infrastructure, no webhooks, no database.
 
-## Usage
-
-Once installed, TriageBot runs automatically on every new issue and every issue edit. You don't need to do anything.
-
-**What you'll see:**
-- New issues get a category label (`bug`, `feature-request`, etc.) if the classification is confident, or `needs-triage` if it's ambiguous
-- Issues missing required information get a `needs-info` label and a comment listing what's needed
-- When an issue is edited to include the missing info, `needs-info` is automatically removed
+---
 
 ## Configuration
 
-TriageBot works with zero configuration. To customize, create `.github/triagebot.yml`:
+TriageBot works with zero configuration out of the box. To customize behavior, create `.github/triagebot.yml` in your repo:
 
 ```yaml
 classification:
+  # Labels to classify issues into.
+  # These labels are created on your repo automatically if they don't exist.
+  # Default: [bug, feature-request, question, documentation]
   categories:
     - bug
     - enhancement
@@ -80,18 +98,51 @@ classification:
     - docs
 
 missing_info:
+  # Fields required in all issue reports.
+  # TriageBot uses heuristic matching (section headers, bold labels) to detect presence.
+  # Default: [reproduction steps, expected behavior, actual behavior]
   required_fields:
     - reproduction steps
     - expected behavior
     - actual behavior
 ```
 
-See [`.github/triagebot.example.yml`](.github/triagebot.example.yml) for the full reference.
+See [`.github/triagebot.example.yml`](.github/triagebot.example.yml) for the full annotated reference.
+
+### Config keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `classification.categories` | list of strings | `[bug, feature-request, question, documentation]` | Labels to classify issues into |
+| `missing_info.required_fields` | list of strings | `[reproduction steps, expected behavior, actual behavior]` | Fields that must be present in issue body |
+
+---
+
+## Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `github-token` | Yes | — | GitHub token with `issues: write` permission (use `secrets.GITHUB_TOKEN`) |
+| `openai-api-key` | Yes | — | OpenAI API key for LLM classification |
+| `config-path` | No | `.github/triagebot.yml` | Path to config file relative to repo root |
+
+---
 
 ## Cost
 
 TriageBot uses `gpt-4o-mini`, which costs ~$0.00015 per issue. A repo receiving 1,000 issues/month spends about **$0.15**.
 
+---
+
+## Contributing
+
+1. Fork the repo and create a branch
+2. Install dev dependencies: `pip install -e ".[dev]"`
+3. Run tests: `pytest -q`
+4. Open a pull request
+
+---
+
 ## License
 
-MIT
+[MIT](LICENSE) — © 2026 DaemonShip
