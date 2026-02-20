@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .classifier import Classifier
 from .config import load_config
+from .events import IssueEvent, parse_event
 from .github_client import GitHubClient
 from .missing_info import build_missing_info_comment, find_missing_fields
 
@@ -40,30 +41,25 @@ def _require_env(name: str) -> str:
 
 
 def handle_opened(
-    issue: dict,
+    event: IssueEvent,
     gh: GitHubClient,
     classifier: Classifier,
     categories: list[str],
     required_fields: list[str],
-    repo: str,
 ) -> None:
-    issue_number = issue["number"]
-    title = issue.get("title", "")
-    body = issue.get("body") or ""
-
-    logger.info("Processing opened issue #%d: %s", issue_number, title[:80])
+    logger.info("Processing opened issue #%d: %s", event.number, event.title[:80])
 
     # --- Classification ---
-    result = classifier.classify(title, body, categories)
+    result = classifier.classify(event.title, event.body, categories)
     logger.info(
         "Classification: category=%r confidence=%.2f", result.category, result.confidence
     )
 
     if result.confidence >= CONFIDENCE_THRESHOLD:
-        gh.add_label(issue_number, result.category)
+        gh.add_label(event.number, result.category)
         logger.info("Applied label %r", result.category)
     else:
-        gh.add_label(issue_number, NEEDS_TRIAGE_LABEL)
+        gh.add_label(event.number, NEEDS_TRIAGE_LABEL)
         logger.info(
             "Low confidence (%.2f < %.2f), applied %r",
             result.confidence,
@@ -72,41 +68,36 @@ def handle_opened(
         )
 
     # --- Missing info check ---
-    missing = find_missing_fields(body, required_fields)
+    missing = find_missing_fields(event.body, required_fields)
     if missing:
         logger.info("Missing fields: %s", missing)
-        gh.add_label(issue_number, NEEDS_INFO_LABEL)
-        gh.post_comment(issue_number, build_missing_info_comment(missing))
+        gh.add_label(event.number, NEEDS_INFO_LABEL)
+        gh.post_comment(event.number, build_missing_info_comment(missing))
     else:
         logger.info("All required fields present")
 
 
 def handle_edited(
-    issue: dict,
+    event: IssueEvent,
     gh: GitHubClient,
     required_fields: list[str],
 ) -> None:
     """On edit, re-check missing info only. Do not re-classify."""
-    issue_number = issue["number"]
-    body = issue.get("body") or ""
-    current_labels = gh.get_issue_labels(issue_number)
-
-    if NEEDS_INFO_LABEL not in current_labels:
-        logger.info("Issue #%d edited but no needs-info label — nothing to do", issue_number)
+    # Use labels from the event payload — avoids an extra API call.
+    if NEEDS_INFO_LABEL not in event.labels:
+        logger.info("Issue #%d edited but no needs-info label — nothing to do", event.number)
         return
 
-    missing = find_missing_fields(body, required_fields)
+    missing = find_missing_fields(event.body, required_fields)
     if not missing:
-        gh.remove_label(issue_number, NEEDS_INFO_LABEL)
+        gh.remove_label(event.number, NEEDS_INFO_LABEL)
         logger.info(
             "Issue #%d now has all required fields — removed %r",
-            issue_number,
+            event.number,
             NEEDS_INFO_LABEL,
         )
     else:
-        logger.info(
-            "Issue #%d edited but still missing: %s", issue_number, missing
-        )
+        logger.info("Issue #%d edited but still missing: %s", event.number, missing)
 
 
 def main() -> None:
@@ -119,11 +110,10 @@ def main() -> None:
         logger.info("Event %r is not 'issues' — nothing to do", event_name)
         sys.exit(0)
 
-    event = _load_event()
-    action = event.get("action")
-    issue = event.get("issue")
+    raw_event = _load_event()
+    issue_event = parse_event(raw_event)
 
-    if not issue:
+    if not issue_event:
         logger.warning("Event has no 'issue' payload — skipping")
         sys.exit(0)
 
@@ -138,12 +128,12 @@ def main() -> None:
     with GitHubClient(github_token, repo) as gh:
         classifier = Classifier(openai_api_key)
 
-        if action == "opened":
-            handle_opened(issue, gh, classifier, categories, required_fields, repo)
-        elif action == "edited":
-            handle_edited(issue, gh, required_fields)
+        if issue_event.action == "opened":
+            handle_opened(issue_event, gh, classifier, categories, required_fields)
+        elif issue_event.action == "edited":
+            handle_edited(issue_event, gh, required_fields)
         else:
-            logger.info("Action %r — nothing to do", action)
+            logger.info("Action %r — nothing to do", issue_event.action)
 
 
 if __name__ == "__main__":
