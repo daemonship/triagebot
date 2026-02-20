@@ -25,6 +25,15 @@ NEEDS_TRIAGE_LABEL = "needs-triage"
 NEEDS_INFO_LABEL = "needs-info"
 CONFIDENCE_THRESHOLD = 0.7
 
+_LOW_CONFIDENCE_COMMENT = """\
+👋 Thanks for opening this issue!
+
+TriageBot wasn't confident enough to automatically assign a category \
+(confidence: {confidence:.0%}). A maintainer will review and label it shortly.
+
+If you'd like to help speed things up, feel free to clarify the issue type in a comment.
+"""
+
 
 def _load_event() -> dict:
     event_path = os.environ.get("GITHUB_EVENT_PATH")
@@ -60,8 +69,12 @@ def handle_opened(
         logger.info("Applied label %r", result.category)
     else:
         gh.add_label(event.number, NEEDS_TRIAGE_LABEL)
+        gh.post_comment(
+            event.number,
+            _LOW_CONFIDENCE_COMMENT.format(confidence=result.confidence),
+        )
         logger.info(
-            "Low confidence (%.2f < %.2f), applied %r",
+            "Low confidence (%.2f < %.2f), applied %r and posted comment",
             result.confidence,
             CONFIDENCE_THRESHOLD,
             NEEDS_TRIAGE_LABEL,
