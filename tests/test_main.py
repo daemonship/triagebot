@@ -109,6 +109,18 @@ def test_missing_info_adds_needs_info_label():
     gh.post_comment.assert_called_once()
 
 
+def test_missing_info_comment_names_missing_fields():
+    """The posted comment must list each missing field so the reporter knows what to add."""
+    gh = _make_gh()
+    clf = _make_classifier("bug", 0.95)
+    handle_opened(_make_event(body="short body"), gh, clf, CATEGORIES, REQUIRED_FIELDS)
+
+    comment_body = gh.post_comment.call_args.args[1]
+    assert "Reproduction Steps" in comment_body
+    assert "Expected Behavior" in comment_body
+    assert "Actual Behavior" in comment_body
+
+
 def test_complete_body_no_needs_info():
     gh = _make_gh()
     clf = _make_classifier("bug", 0.95)
@@ -116,6 +128,16 @@ def test_complete_body_no_needs_info():
 
     applied_labels = [c.args[1] for c in gh.add_label.call_args_list]
     assert NEEDS_INFO_LABEL not in applied_labels
+
+
+def test_edited_no_reclassification():
+    """handle_edited must never call the classifier — only re-check missing fields."""
+    clf = _make_classifier()
+    gh = _make_gh()
+    event = _make_event(action="edited", labels=[NEEDS_INFO_LABEL], body=_FULL_BODY)
+    handle_edited(event, gh, REQUIRED_FIELDS)
+
+    clf.classify.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
