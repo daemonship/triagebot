@@ -1,0 +1,76 @@
+# TriageBot
+
+Automatically classify GitHub issues and request missing information — powered by `gpt-4o-mini`.
+
+When someone opens an issue, TriageBot:
+1. Classifies it into a category (`bug`, `feature-request`, `question`, `documentation`) and applies the matching label
+2. Checks whether required fields are present (reproduction steps, expected behavior, actual behavior) and posts a comment requesting anything missing
+
+On issue edits, it re-checks the missing fields and removes the `needs-info` label once everything is filled in.
+
+## Install
+
+**30-second setup:**
+
+1. Add your OpenAI API key to your repo secrets: **Settings → Secrets and variables → Actions → New repository secret** → name it `OPENAI_API_KEY`
+
+2. Create `.github/workflows/triagebot.yml` in your repo:
+
+```yaml
+name: TriageBot
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: daemonship/triagebot@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+```
+
+That's it. No infrastructure, no webhooks, no database.
+
+## Usage
+
+Once installed, TriageBot runs automatically on every new issue and every issue edit. You don't need to do anything.
+
+**What you'll see:**
+- New issues get a category label (`bug`, `feature-request`, etc.) if the classification is confident, or `needs-triage` if it's ambiguous
+- Issues missing required information get a `needs-info` label and a comment listing what's needed
+- When an issue is edited to include the missing info, `needs-info` is automatically removed
+
+## Configuration
+
+TriageBot works with zero configuration. To customize, create `.github/triagebot.yml`:
+
+```yaml
+classification:
+  categories:
+    - bug
+    - enhancement
+    - question
+    - docs
+
+missing_info:
+  required_fields:
+    - reproduction steps
+    - expected behavior
+    - actual behavior
+```
+
+See [`.github/triagebot.example.yml`](.github/triagebot.example.yml) for the full reference.
+
+## Cost
+
+TriageBot uses `gpt-4o-mini`, which costs ~$0.00015 per issue. A repo receiving 1,000 issues/month spends about **$0.15**.
+
+## License
+
+MIT

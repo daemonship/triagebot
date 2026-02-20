@@ -1,0 +1,19 @@
+# TriageBot configuration — copy to .github/triagebot.yml to customize
+# All settings are optional. TriageBot works with zero config.
+
+classification:
+  # Labels to classify issues into. These labels will be created on your repo
+  # automatically if they don't exist.
+  categories:
+    - bug
+    - feature-request
+    - question
+    - documentation
+
+missing_info:
+  # Fields required in all bug reports. TriageBot uses heuristic matching
+  # (section headers, bold labels) to detect whether each field is present.
+  required_fields:
+    - reproduction steps
+    - expected behavior
+    - actual behavior

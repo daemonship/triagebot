@@ -1,0 +1,36 @@
+name: TriageBot
+description: Automatically classify GitHub issues and request missing information using an LLM.
+author: DaemonShip
+
+branding:
+  icon: tag
+  color: blue
+
+inputs:
+  github-token:
+    description: GitHub token with issues write permission (use secrets.GITHUB_TOKEN)
+    required: true
+  openai-api-key:
+    description: OpenAI API key for issue classification
+    required: true
+  config-path:
+    description: Path to triagebot config file (relative to repo root)
+    required: false
+    default: .github/triagebot.yml
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install TriageBot
+      run: pip install -e ${{ github.action_path }} --quiet
+      shell: bash
+    - name: Run TriageBot
+      run: python -m triagebot
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        TRIAGEBOT_CONFIG_PATH: ${{ inputs.config-path }}
