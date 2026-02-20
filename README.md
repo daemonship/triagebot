@@ -8,6 +8,21 @@ Automatically classify GitHub issues and request missing information — powered
 > Found a bug? Have a feature idea? Something feel wrong or missing?
 > **[Open an issue](../../issues)** — every piece of feedback directly shapes what gets built next.
 
+## Status
+
+> 🚧 In active development — not yet production ready
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Project scaffold & CI | ✅ Complete | pyproject.toml, action.yml, workflows |
+| GitHub API client & event parsing | ✅ Complete | httpx, clean IssueEvent objects |
+| LLM classification & label application | ✅ Complete | gpt-4o-mini, function calling, retry |
+| Missing info detection & comment posting | ✅ Complete | Heuristic field checks, needs-info lifecycle |
+| YAML config with zero-config defaults | ✅ Complete | pydantic validation, .github/triagebot.yml |
+| README, install docs & marketplace metadata | 🚧 In Progress | |
+| Code review | 📋 Planned | |
+| Publish to GitHub Marketplace | 📋 Planned | |
+
 When someone opens an issue, TriageBot:
 1. Classifies it into a category (`bug`, `feature-request`, `question`, `documentation`) and applies the matching label
 2. Checks whether required fields are present (reproduction steps, expected behavior, actual behavior) and posts a comment requesting anything missing
