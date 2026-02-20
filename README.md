@@ -2,6 +2,12 @@
 
 Automatically classify GitHub issues and request missing information — powered by `gpt-4o-mini`.
 
+## Feedback & Ideas
+
+> **This project is being built in public and we want to hear from you.**
+> Found a bug? Have a feature idea? Something feel wrong or missing?
+> **[Open an issue](../../issues)** — every piece of feedback directly shapes what gets built next.
+
 When someone opens an issue, TriageBot:
 1. Classifies it into a category (`bug`, `feature-request`, `question`, `documentation`) and applies the matching label
 2. Checks whether required fields are present (reproduction steps, expected behavior, actual behavior) and posts a comment requesting anything missing
