@@ -1,7 +1,7 @@
 """Tests for GitHub event parsing."""
 
 
-from triagebot.events import IssueEvent, parse_event
+from triagebot.events import IssueEvent, parse_comment_event, parse_event
 
 
 def _make_event(action: str, number: int = 42, title: str = "Test issue",
@@ -97,3 +97,73 @@ def test_issue_event_dataclass_fields():
 def test_issue_event_default_labels():
     ev = IssueEvent(action="opened", number=1, title="t", body="b")
     assert ev.labels == []
+
+
+# ---------------------------------------------------------------------------
+# parse_comment_event
+# ---------------------------------------------------------------------------
+
+
+def _make_comment_event(
+    action: str = "created",
+    issue_number: int = 42,
+    issue_title: str = "App crashes",
+    issue_body: str = "It crashes",
+    issue_labels: list[str] | None = None,
+    comment_body: str = "/label bug",
+) -> dict:
+    return {
+        "action": action,
+        "issue": {
+            "number": issue_number,
+            "title": issue_title,
+            "body": issue_body,
+            "labels": [{"name": n} for n in (issue_labels or [])],
+        },
+        "comment": {
+            "body": comment_body,
+        },
+    }
+
+
+def test_parse_comment_event_basic():
+    raw = _make_comment_event()
+    result = parse_comment_event(raw)
+    assert result is not None
+    assert result.action == "created"
+    assert result.issue_number == 42
+    assert result.issue_title == "App crashes"
+    assert result.issue_body == "It crashes"
+    assert result.issue_labels == []
+    assert result.comment_body == "/label bug"
+
+
+def test_parse_comment_event_with_labels():
+    raw = _make_comment_event(issue_labels=["bug", "needs-triage"])
+    result = parse_comment_event(raw)
+    assert result is not None
+    assert result.issue_labels == ["bug", "needs-triage"]
+
+
+def test_parse_comment_event_missing_issue_returns_none():
+    result = parse_comment_event({"action": "created", "comment": {"body": "/label bug"}})
+    assert result is None
+
+
+def test_parse_comment_event_missing_comment_returns_none():
+    result = parse_comment_event({"action": "created", "issue": {"number": 1, "labels": []}})
+    assert result is None
+
+
+def test_parse_comment_event_none_body_becomes_empty_string():
+    raw = _make_comment_event(comment_body=None)
+    result = parse_comment_event(raw)
+    assert result is not None
+    assert result.comment_body == ""
+
+
+def test_parse_comment_event_non_created_action():
+    raw = _make_comment_event(action="deleted")
+    result = parse_comment_event(raw)
+    assert result is not None
+    assert result.action == "deleted"

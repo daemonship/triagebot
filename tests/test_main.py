@@ -1,11 +1,11 @@
-"""Tests for handle_opened and handle_edited dispatch logic."""
+"""Tests for handle_opened, handle_edited, and handle_comment dispatch logic."""
 
 from unittest.mock import MagicMock
 
 
 from triagebot.classifier import ClassificationResult
-from triagebot.events import IssueEvent
-from triagebot.main import CONFIDENCE_THRESHOLD, NEEDS_INFO_LABEL, NEEDS_TRIAGE_LABEL, handle_edited, handle_opened
+from triagebot.events import CommentEvent, IssueEvent
+from triagebot.main import CONFIDENCE_THRESHOLD, NEEDS_INFO_LABEL, NEEDS_TRIAGE_LABEL, handle_comment, handle_edited, handle_opened
 
 CATEGORIES = ["bug", "feature-request", "question", "documentation"]
 REQUIRED_FIELDS = ["reproduction steps", "expected behavior", "actual behavior"]
@@ -200,4 +200,103 @@ def test_classification_disabled_no_api_comment():
     gh = _make_gh()
     handle_opened(_make_event(body=_FULL_BODY), gh, None, CATEGORIES, REQUIRED_FIELDS)
 
+    gh.post_comment.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# handle_comment — /label command
+# ---------------------------------------------------------------------------
+
+
+def _make_comment_event(comment_body="/label bug", issue_labels=None):
+    return CommentEvent(
+        action="created",
+        issue_number=42,
+        issue_title="App crashes",
+        issue_body=_FULL_BODY,
+        issue_labels=issue_labels or [],
+        comment_body=comment_body,
+    )
+
+
+def test_slash_label_applies_requested_label():
+    gh = _make_gh()
+    handle_comment(_make_comment_event("/label feature-request"), gh, None, CATEGORIES)
+    gh.add_label.assert_called_once_with(42, "feature-request")
+
+
+def test_slash_label_removes_existing_category_labels():
+    gh = _make_gh()
+    event = _make_comment_event("/label bug", issue_labels=["feature-request", "needs-triage"])
+    handle_comment(event, gh, None, CATEGORIES)
+
+    removed = [c.args[1] for c in gh.remove_label.call_args_list]
+    assert "feature-request" in removed
+    assert "needs-triage" in removed
+    gh.add_label.assert_called_once_with(42, "bug")
+
+
+def test_slash_label_unknown_category_does_nothing():
+    gh = _make_gh()
+    handle_comment(_make_comment_event("/label unknown-thing"), gh, None, CATEGORIES)
+    gh.add_label.assert_not_called()
+    gh.remove_label.assert_not_called()
+
+
+def test_slash_label_case_insensitive():
+    gh = _make_gh()
+    handle_comment(_make_comment_event("/Label Bug"), gh, None, CATEGORIES)
+    gh.add_label.assert_called_once_with(42, "bug")
+
+
+def test_slash_label_in_multiline_comment():
+    gh = _make_gh()
+    body = "Thanks for the triage!\n\n/label question\n\nMore text here."
+    handle_comment(_make_comment_event(body), gh, None, CATEGORIES)
+    gh.add_label.assert_called_once_with(42, "question")
+
+
+# ---------------------------------------------------------------------------
+# handle_comment — /reclassify command
+# ---------------------------------------------------------------------------
+
+
+def test_slash_reclassify_applies_high_confidence_label():
+    gh = _make_gh()
+    clf = _make_classifier("bug", 0.90)
+    event = _make_comment_event("/reclassify", issue_labels=["needs-triage"])
+    handle_comment(event, gh, clf, CATEGORIES)
+
+    removed = [c.args[1] for c in gh.remove_label.call_args_list]
+    assert "needs-triage" in removed
+    gh.add_label.assert_called_once_with(42, "bug")
+
+
+def test_slash_reclassify_low_confidence_applies_needs_triage():
+    gh = _make_gh()
+    clf = _make_classifier("bug", CONFIDENCE_THRESHOLD - 0.01)
+    handle_comment(_make_comment_event("/reclassify"), gh, clf, CATEGORIES)
+
+    applied = [c.args[1] for c in gh.add_label.call_args_list]
+    assert NEEDS_TRIAGE_LABEL in applied
+    gh.post_comment.assert_called_once()
+
+
+def test_slash_reclassify_disabled_classifier_does_nothing():
+    gh = _make_gh()
+    handle_comment(_make_comment_event("/reclassify"), gh, None, CATEGORIES)
+    gh.add_label.assert_not_called()
+    gh.remove_label.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# handle_comment — no slash command
+# ---------------------------------------------------------------------------
+
+
+def test_non_slash_comment_does_nothing():
+    gh = _make_gh()
+    handle_comment(_make_comment_event("Just a regular comment, no commands."), gh, None, CATEGORIES)
+    gh.add_label.assert_not_called()
+    gh.remove_label.assert_not_called()
     gh.post_comment.assert_not_called()
