@@ -168,3 +168,36 @@ def test_edited_without_needs_info_label_does_nothing():
     gh.remove_label.assert_not_called()
     gh.add_label.assert_not_called()
     gh.post_comment.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# handle_opened — classification disabled (classifier=None)
+# ---------------------------------------------------------------------------
+
+
+def test_classification_disabled_skips_llm():
+    """When classifier is None, no classification label should be applied."""
+    gh = _make_gh()
+    handle_opened(_make_event(body=_FULL_BODY), gh, None, CATEGORIES, REQUIRED_FIELDS)
+
+    applied_labels = [c.args[1] for c in gh.add_label.call_args_list]
+    assert "bug" not in applied_labels
+    assert NEEDS_TRIAGE_LABEL not in applied_labels
+
+
+def test_classification_disabled_still_checks_missing_info():
+    """Missing-info detection must still run even when classification is disabled."""
+    gh = _make_gh()
+    handle_opened(_make_event(body="short body"), gh, None, CATEGORIES, REQUIRED_FIELDS)
+
+    applied_labels = [c.args[1] for c in gh.add_label.call_args_list]
+    assert NEEDS_INFO_LABEL in applied_labels
+    gh.post_comment.assert_called_once()
+
+
+def test_classification_disabled_no_api_comment():
+    """No low-confidence comment should be posted when classification is disabled."""
+    gh = _make_gh()
+    handle_opened(_make_event(body=_FULL_BODY), gh, None, CATEGORIES, REQUIRED_FIELDS)
+
+    gh.post_comment.assert_not_called()

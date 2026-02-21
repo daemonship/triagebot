@@ -2,6 +2,11 @@
 # All settings are optional. TriageBot works with zero config.
 
 classification:
+  # Set to false to disable LLM classification entirely. No API key is required
+  # when disabled — missing-info detection still works. Useful for cost control.
+  # Default: true
+  enabled: true
+
   # Labels to classify issues into. These labels will be created on your repo
   # automatically if they don't exist.
   categories:

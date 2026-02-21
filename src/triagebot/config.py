@@ -14,6 +14,7 @@ DEFAULT_REQUIRED_FIELDS = ["reproduction steps", "expected behavior", "actual be
 
 
 class ClassificationConfig(BaseModel):
+    enabled: bool = True
     categories: list[str] = DEFAULT_CATEGORIES
 
     @field_validator("categories")
