@@ -156,6 +156,46 @@ missing_info:
 
 ---
 
+## Reliability & Error Handling
+
+TriageBot is designed to fail safely and leave a clear audit trail in the GitHub Actions log.
+
+### Logging
+
+Every run emits structured log lines with timestamps and log levels, visible in the **Actions** tab of your repository:
+
+```
+2024-01-15T10:23:01 [triagebot] INFO Processing opened issue #42: App crashes on login
+2024-01-15T10:23:02 [triagebot] INFO Classification: category='bug' confidence=0.94
+2024-01-15T10:23:02 [triagebot] INFO Applied label 'bug'
+2024-01-15T10:23:02 [triagebot] INFO All required fields present
+```
+
+### OpenAI API failures
+
+If the OpenAI API is unreachable or rate-limited, TriageBot:
+
+1. **Retries up to 3 times** with exponential backoff (4 s → 8 s → 16 s) for `RateLimitError`, timeout, and connection errors
+2. **Falls back to `needs-triage`** if all retries are exhausted — the issue is labeled for manual review rather than dropped
+3. **Logs a warning** with the error message so the failure is visible in the Actions log
+
+Invalid API keys cause an immediate `AuthenticationError` which fails the Action with a clear log message.
+
+### GitHub API failures
+
+If the GitHub API returns a network error (connection refused, timeout, etc.), TriageBot:
+
+1. **Retries up to 3 times** with exponential backoff (2 s → 4 s → 8 s)
+2. **Fails the Action** if all retries are exhausted, surfacing the error in the Actions log
+
+HTTP 4xx errors (bad token, missing permissions) are not retried — they fail immediately with a descriptive error.
+
+### If the Action fails
+
+GitHub Actions marks the workflow run as failed and sends an email notification to repository maintainers (based on your notification settings). The full log is available in the **Actions** tab for debugging.
+
+---
+
 ## Contributing
 
 1. Fork the repo and create a branch
