@@ -1,14 +1,12 @@
 """Tests for config loading."""
 
 import textwrap
-from pathlib import Path
 
 import pytest
 
 from triagebot.config import (
     DEFAULT_CATEGORIES,
     DEFAULT_REQUIRED_FIELDS,
-    TriageBotConfig,
     load_config,
 )
 

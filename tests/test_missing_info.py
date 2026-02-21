@@ -2,7 +2,6 @@
 
 import textwrap
 
-import pytest
 
 from triagebot.missing_info import find_missing_fields, build_missing_info_comment
 

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from triagebot.classifier import Classifier, ClassificationResult
+from triagebot.classifier import Classifier
 
 CATEGORIES = ["bug", "feature-request", "question", "documentation"]
 

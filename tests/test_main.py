@@ -1,8 +1,7 @@
 """Tests for handle_opened and handle_edited dispatch logic."""
 
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
-import pytest
 
 from triagebot.classifier import ClassificationResult
 from triagebot.events import IssueEvent

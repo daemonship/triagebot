@@ -1,6 +1,5 @@
 """Tests for GitHub event parsing."""
 
-import pytest
 
 from triagebot.events import IssueEvent, parse_event
 
