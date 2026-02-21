@@ -3,6 +3,7 @@
 import pytest
 import httpx
 from pytest_httpx import HTTPXMock
+from unittest.mock import patch
 
 from triagebot.github_client import GitHubClient, GITHUB_API
 
@@ -149,3 +150,41 @@ def test_auth_header_sent(client: GitHubClient, httpx_mock: HTTPXMock):
 
     httpx_mock.add_callback(check_auth, url=_issue_labels_url())
     client.get_issue_labels(ISSUE_NUM)
+
+
+# ---------------------------------------------------------------------------
+# Retry on transient network errors
+# ---------------------------------------------------------------------------
+
+def test_network_error_is_retried(client: GitHubClient, httpx_mock: HTTPXMock):
+    """A single transient network error is retried; success on the next attempt."""
+    attempts = [0]
+
+    def flaky(request: httpx.Request) -> httpx.Response:
+        attempts[0] += 1
+        if attempts[0] == 1:
+            raise httpx.ConnectError("connection refused")
+        return httpx.Response(200, json=[{"name": "bug"}])
+
+    # Register twice — one for the failing attempt, one for the retry
+    httpx_mock.add_callback(flaky, url=_issue_labels_url())
+    httpx_mock.add_callback(flaky, url=_issue_labels_url())
+
+    with patch("time.sleep"):
+        labels = client.get_issue_labels(ISSUE_NUM)
+
+    assert labels == ["bug"]
+    assert attempts[0] == 2
+
+
+def test_network_error_reraises_after_max_attempts(client: GitHubClient, httpx_mock: HTTPXMock):
+    """After 3 failed attempts, the ConnectError is re-raised to the caller."""
+    def always_fail(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    for _ in range(3):
+        httpx_mock.add_callback(always_fail, url=_issue_labels_url())
+
+    with patch("time.sleep"):
+        with pytest.raises(httpx.ConnectError):
+            client.get_issue_labels(ISSUE_NUM)
