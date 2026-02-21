@@ -64,3 +64,20 @@ def test_empty_config_file_uses_defaults(tmp_path, monkeypatch):
     (cfg_dir / "triagebot.yml").write_text("")
     config = load_config(tmp_path)
     assert config.classification.categories == DEFAULT_CATEGORIES
+
+
+def test_classification_enabled_default(tmp_path):
+    config = load_config(tmp_path)
+    assert config.classification.enabled is True
+
+
+def test_classification_disabled(tmp_path, monkeypatch):
+    monkeypatch.setenv("TRIAGEBOT_CONFIG_PATH", ".github/triagebot.yml")
+    cfg_dir = tmp_path / ".github"
+    cfg_dir.mkdir()
+    (cfg_dir / "triagebot.yml").write_text(textwrap.dedent("""\
+        classification:
+          enabled: false
+    """))
+    config = load_config(tmp_path)
+    assert config.classification.enabled is False

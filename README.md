@@ -113,6 +113,7 @@ See [`.github/triagebot.example.yml`](.github/triagebot.example.yml) for the ful
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| `classification.enabled` | boolean | `true` | Set to `false` to disable LLM classification entirely (no API calls, zero cost) |
 | `classification.categories` | list of strings | `[bug, feature-request, question, documentation]` | Labels to classify issues into |
 | `missing_info.required_fields` | list of strings | `[reproduction steps, expected behavior, actual behavior]` | Fields that must be present in issue body |
 
@@ -130,7 +131,28 @@ See [`.github/triagebot.example.yml`](.github/triagebot.example.yml) for the ful
 
 ## Cost
 
-TriageBot uses `gpt-4o-mini`, which costs ~$0.00015 per issue. A repo receiving 1,000 issues/month spends about **$0.15**.
+TriageBot uses `gpt-4o-mini` by default, which costs approximately **$0.00015 per issue classified** (~150 input tokens for the prompt + title/body, 10–20 output tokens for the JSON response).
+
+| Volume | Estimated monthly cost |
+|--------|----------------------|
+| 100 issues/month | ~$0.015 |
+| 1,000 issues/month | ~$0.15 |
+| 10,000 issues/month | ~$1.50 |
+
+**To eliminate API costs entirely**, set `classification.enabled: false` in `.github/triagebot.yml`. Missing-info detection continues to work with no API calls:
+
+```yaml
+classification:
+  enabled: false   # disable LLM classification — no API key needed
+
+missing_info:
+  required_fields:
+    - reproduction steps
+    - expected behavior
+    - actual behavior
+```
+
+**To use a cheaper or self-hosted model**, set the `base-url` and `model` inputs in your workflow to point to any OpenAI-compatible endpoint (Gemini, DeepSeek, Ollama, etc.).
 
 ---
 

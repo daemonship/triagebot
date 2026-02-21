@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 from .classifier import Classifier
 from .config import load_config
@@ -52,33 +53,36 @@ def _require_env(name: str) -> str:
 def handle_opened(
     event: IssueEvent,
     gh: GitHubClient,
-    classifier: Classifier,
+    classifier: Optional[Classifier],
     categories: list[str],
     required_fields: list[str],
 ) -> None:
     logger.info("Processing opened issue #%d: %s", event.number, event.title[:80])
 
     # --- Classification ---
-    result = classifier.classify(event.title, event.body, categories)
-    logger.info(
-        "Classification: category=%r confidence=%.2f", result.category, result.confidence
-    )
-
-    if result.confidence >= CONFIDENCE_THRESHOLD:
-        gh.add_label(event.number, result.category)
-        logger.info("Applied label %r", result.category)
+    if classifier is None:
+        logger.info("Classification disabled — skipping LLM call")
     else:
-        gh.add_label(event.number, NEEDS_TRIAGE_LABEL)
-        gh.post_comment(
-            event.number,
-            _LOW_CONFIDENCE_COMMENT.format(confidence=result.confidence),
-        )
+        result = classifier.classify(event.title, event.body, categories)
         logger.info(
-            "Low confidence (%.2f < %.2f), applied %r and posted comment",
-            result.confidence,
-            CONFIDENCE_THRESHOLD,
-            NEEDS_TRIAGE_LABEL,
+            "Classification: category=%r confidence=%.2f", result.category, result.confidence
         )
+
+        if result.confidence >= CONFIDENCE_THRESHOLD:
+            gh.add_label(event.number, result.category)
+            logger.info("Applied label %r", result.category)
+        else:
+            gh.add_label(event.number, NEEDS_TRIAGE_LABEL)
+            gh.post_comment(
+                event.number,
+                _LOW_CONFIDENCE_COMMENT.format(confidence=result.confidence),
+            )
+            logger.info(
+                "Low confidence (%.2f < %.2f), applied %r and posted comment",
+                result.confidence,
+                CONFIDENCE_THRESHOLD,
+                NEEDS_TRIAGE_LABEL,
+            )
 
     # --- Missing info check ---
     missing = find_missing_fields(event.body, required_fields)
@@ -115,9 +119,6 @@ def handle_edited(
 
 def main() -> None:
     github_token = _require_env("GITHUB_TOKEN")
-    openai_api_key = _require_env("OPENAI_API_KEY")
-    openai_base_url = os.environ.get("OPENAI_BASE_URL") or None
-    openai_model = os.environ.get("OPENAI_MODEL") or None
     repo = _require_env("GITHUB_REPOSITORY")
     event_name = os.environ.get("GITHUB_EVENT_NAME", "")
 
@@ -137,11 +138,23 @@ def main() -> None:
     required_fields = config.missing_info.required_fields
 
     logger.info(
-        "Config: categories=%s required_fields=%s", categories, required_fields
+        "Config: categories=%s required_fields=%s classification_enabled=%s",
+        categories,
+        required_fields,
+        config.classification.enabled,
     )
 
     with GitHubClient(github_token, repo) as gh:
-        classifier = Classifier(openai_api_key, base_url=openai_base_url, model=openai_model)
+        if config.classification.enabled:
+            openai_api_key = _require_env("OPENAI_API_KEY")
+            openai_base_url = os.environ.get("OPENAI_BASE_URL") or None
+            openai_model = os.environ.get("OPENAI_MODEL") or None
+            classifier: Optional[Classifier] = Classifier(
+                openai_api_key, base_url=openai_base_url, model=openai_model
+            )
+        else:
+            logger.info("Classification disabled via config — no LLM calls will be made")
+            classifier = None
 
         if issue_event.action == "opened":
             handle_opened(issue_event, gh, classifier, categories, required_fields)
