@@ -1,9 +1,10 @@
-"""LLM-based issue intent classification using OpenAI gpt-4o-mini."""
+"""LLM-based issue intent classification using an OpenAI-compatible API."""
 
 from __future__ import annotations
 
 import json
 import logging
+from typing import Optional
 
 from openai import OpenAI, RateLimitError, APITimeoutError, APIConnectionError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -14,6 +15,8 @@ logger = logging.getLogger(__name__)
 # Prevents runaway token usage and limits prompt injection surface.
 _MAX_TITLE_CHARS = 200
 _MAX_BODY_CHARS = 2000
+
+_DEFAULT_MODEL = "gpt-4o-mini"
 
 _SYSTEM_PROMPT = """\
 You are an issue triage assistant for a software project.
@@ -48,8 +51,14 @@ class ClassificationResult:
 
 
 class Classifier:
-    def __init__(self, api_key: str) -> None:
-        self._client = OpenAI(api_key=api_key)
+    def __init__(
+        self,
+        api_key: str,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> None:
+        self._client = OpenAI(api_key=api_key, base_url=base_url or None)
+        self._model = model or _DEFAULT_MODEL
 
     def classify(
         self, title: str, body: str, categories: list[str]
@@ -81,19 +90,12 @@ class Classifier:
         )
 
         response = self._client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self._model,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": user_message},
             ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "classification",
-                    "strict": True,
-                    "schema": _CLASSIFICATION_SCHEMA,
-                },
-            },
+            response_format={"type": "json_object"},
             max_tokens=64,
             temperature=0,
         )

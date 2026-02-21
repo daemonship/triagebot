@@ -116,6 +116,8 @@ def handle_edited(
 def main() -> None:
     github_token = _require_env("GITHUB_TOKEN")
     openai_api_key = _require_env("OPENAI_API_KEY")
+    openai_base_url = os.environ.get("OPENAI_BASE_URL") or None
+    openai_model = os.environ.get("OPENAI_MODEL") or None
     repo = _require_env("GITHUB_REPOSITORY")
     event_name = os.environ.get("GITHUB_EVENT_NAME", "")
 
@@ -139,7 +141,7 @@ def main() -> None:
     )
 
     with GitHubClient(github_token, repo) as gh:
-        classifier = Classifier(openai_api_key)
+        classifier = Classifier(openai_api_key, base_url=openai_base_url, model=openai_model)
 
         if issue_event.action == "opened":
             handle_opened(issue_event, gh, classifier, categories, required_fields)
